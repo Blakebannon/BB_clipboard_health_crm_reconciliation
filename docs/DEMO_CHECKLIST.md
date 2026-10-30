@@ -1,6 +1,6 @@
 # Demo checklist (~2 minutes)
 
-> Status 2026-10-30: the actionable queue has been fully reviewed (27 applied, 1 rejected). For a recording that still shows a live approval, one evidence-backed candidate remains: reopen the rejected **Union Square** manual-review item, use *Create new-account proposal for the website address*, then approve the resulting `CREATE_MISSING` item (see docs/RESULTS.md). Applied items are visible in the queue under decision filter *approved*; the CHOW items (Marietta, Tiffin) make the best evidence walk-through.
+> Status 2026-10-30: the actionable queue has been fully reviewed and applied (28 applied, 0 pending, 0 failed). No unapplied approval candidate remains. For the recording, show: a CHOW item (Marietta or Tiffin) under decision filter *approved* with its read-back verification JSON; the Owosso duplicate; the Kettering manual-review item as the "reject / insufficient evidence" example (its *Mark reviewed* control is local-only); and `python -m bellhaven.cli verify` or the CRM browser for the live state. Applied items are visible in the queue under decision filter *approved*.
 
 Before recording:
 

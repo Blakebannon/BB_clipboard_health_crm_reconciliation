@@ -39,7 +39,7 @@ Verified 2026-10-30 with the candidate token; zero writes were made.
 | `parent_name` | str | read-only convenience |
 | `billing_street`, `billing_city`, `billing_state`, `billing_zip` | str | one record uses a `PO Box` street; several top-level parent accounts have blank addresses |
 | `care_type` | str | observed: `""`, `Assisted Living`, `Independent Living`, `Memory Care`, `Skilled Nursing` |
-| `status` | str | observed: `Active`, `Inactive` (`Needs Review` has not been observed on any existing record; it is the status the assessment specifies for site-absent accounts and will be proven on the first approved apply) |
+| `status` | str | observed before any write: `Active`, `Inactive`. `Needs Review` (the assessment's status for site-absent accounts) was accepted by `PATCH` and reads back correctly on the three approved accounts |
 | `phone` | str | |
 | `lifetime_revenue`, `outstanding_ar` | int | parsed as `Decimal`; missing/unparseable is treated as unknown, never zero |
 | `chow_current_account`, `duplicate_of_account` | str | `""` when unset |

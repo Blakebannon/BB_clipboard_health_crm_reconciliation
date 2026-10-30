@@ -62,7 +62,7 @@ requires_chow = (old_parent_id != target_parent_id) and (lifetime_revenue > 0) a
 
 ## Phone numbers
 
-The website phone is treated as the current public contact number. In the live sandbox 14 matched accounts carry exactly the site phone and 12 carry a different number, which reads as stale CRM data rather than noise, so a differing phone is proposed as a low-risk `UPDATE_FIELDS` change (`PHONE_DIFFERS`), listed as its own line in the diff and bundled with a rename or re-parent when one exists. A phone match never overrides an address contradiction (Union Square's phone matches, its street does not: manual review).
+The website phone is treated as the current public contact number. In the live sandbox 14 matched accounts carry exactly the site phone and 12 carry a different number, which reads as stale CRM data rather than noise, so a differing phone is proposed as a low-risk `UPDATE_FIELDS` change (`PHONE_DIFFERS`), listed as its own line in the diff and bundled with a rename or re-parent when one exists. A phone match never overrides an address contradiction. (Union Square: the name is similar but street, phone and administrator all differ, so it went to manual review; the reviewer confirmed it is a distinct facility and created the missing account.)
 
 ## Care offerings
 
