@@ -54,6 +54,10 @@ Claude Code (Fable 5.1) was used as the implementation assistant: it read the en
 * Whether the CRM accepts the status value `Needs Review` is only proven on the first approved apply (a 422 is shown as a failed apply, not hidden).
 * `verify` and the dashboard read-back prove the CRM state at that moment; they are not a continuous monitor.
 
-## Results and actual time
+## Results
 
-See `docs/RESULTS.md` for the live counts, proposals by type, idempotency check and the record of approved changes.
+Live outcome (details and account ids in `docs/RESULTS.md`): 35 website facilities, 121 → 126 CRM accounts, 29 → 37 Bellhaven children. 43 proposals generated; the reviewer approved 27 in the app (2 CHOW successors, 3 direct re-parents, 3 new accounts, 1 duplicate, 3 Needs Review, 15 field updates), every one verified by GET read-back; 1 rejected; 0 failed. Six manual-review cases remain documented with recommendations (four keep-unchanged prior-operator records, Kettering needs business input, Union Square can be created from the app). Seven scans were run; after approvals two consecutive scans were identical and no decided item ever reappeared. Zero CRM writes happened outside explicit approvals.
+
+## Time
+
+Reconnaissance and planning were done beforehand (the plan documents). The implementation session with Claude Code, including live verification, the reviewer's approvals and the audits, ran for roughly three and a half hours of wall-clock time on October 30, 2026, more than the suggested two hours; the extra time went into the live-data refinements (PO Box, multi-candidate Kettering, contact pagination bug) and the fault-injection tests for the CHOW recovery path.

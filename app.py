@@ -288,6 +288,28 @@ if (pending or retryable) and not row["stale"]:
                     store.acknowledge(p.proposal_key, f"reviewer selected {pick}: {why.strip()}")
                     st.success(f"{'Created' if created else 'Already exists'}: {newp.action_type} proposal {newp.proposal_key}. Select it in the queue to review and approve.")
                     st.rerun()
+            if "NAME_MATCH_ADDRESS_CONFLICT" in p.reason_codes and p.site and run:
+                st.markdown(
+                    "**A similarly named account exists at a different street.** If you have confirmed it is a different facility "
+                    "(different street, phone, administrator and operator), you can create a new Bellhaven account for the website address. "
+                    "The similarly named account is not touched. This only creates a proposal; approval is a separate step."
+                )
+                why2 = st.text_input("Why is it a different facility? (required)", key=f"createwhy-{p.proposal_key}")
+                if st.button("Create new-account proposal for the website address", disabled=not why2.strip(), key=f"createbtn-{p.proposal_key}"):
+                    from bellhaven.models import CRMAccount, SiteFacility
+                    from bellhaven.rules import RuleContext, reviewer_create_proposal
+
+                    accounts = []
+                    for d in store.crm_snapshot(run["run_id"]):
+                        a = CRMAccount.from_api(d["raw"])
+                        a.contacts = d.get("contacts", [])
+                        accounts.append(a)
+                    ctx = RuleContext(run["bellhaven_parent_id"], next(a.name for a in accounts if a.id == run["bellhaven_parent_id"]), accounts, bool(run["scrape_ok"]), int(run["site_count"] or 0))
+                    newp = reviewer_create_proposal(SiteFacility.from_dict(p.site), ctx, p.candidates, why2.strip())
+                    created = store.add_reviewer_proposal(run["run_id"], newp, why2.strip())
+                    store.acknowledge(p.proposal_key, f"reviewer confirmed distinct facility: {why2.strip()}")
+                    st.success(f"{'Created' if created else 'Already exists'}: CREATE_MISSING proposal {newp.proposal_key}. Select it in the queue to review and approve.")
+                    st.rerun()
             st.markdown("No CRM change is possible for this item as-is. Mark it reviewed to clear it from the pending queue (local ledger only).")
             ack = st.text_input("Reviewer note", key=f"ack-{p.proposal_key}")
             if st.button("Mark reviewed (no CRM change)", key=f"ackbtn-{p.proposal_key}", disabled=not pending):

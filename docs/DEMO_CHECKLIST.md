@@ -1,5 +1,7 @@
 # Demo checklist (~2 minutes)
 
+> Status 2026-10-30: the actionable queue has been fully reviewed (27 applied, 1 rejected). For a recording that still shows a live approval, one evidence-backed candidate remains: reopen the rejected **Union Square** manual-review item, use *Create new-account proposal for the website address*, then approve the resulting `CREATE_MISSING` item (see docs/RESULTS.md). Applied items are visible in the queue under decision filter *approved*; the CHOW items (Marietta, Tiffin) make the best evidence walk-through.
+
 Before recording:
 
 - [ ] `.env` contains `BELLHAVEN_API_TOKEN` (never show the file).

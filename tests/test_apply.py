@@ -341,3 +341,35 @@ def test_forbidden_fields_can_never_be_written(writable_client):
         writable_client.update_account("001LGFPBJY4N9MB6KL", {config.FIELD_REVENUE: 0})
     with pytest.raises(CRMValidationError):
         writable_client.update_account("001LGFPBJY4N9MB6KL", {"made_up_field": 1})
+
+
+def test_reviewer_create_for_name_conflict_creates_once_and_leaves_other_account(settings, store, fake_client):
+    from bellhaven.matching import match_all
+    from bellhaven.models import ACTION_CREATE_MISSING, ACTION_MANUAL_REVIEW, CRMAccount, SiteFacility
+    from bellhaven.rules import RuleContext, reviewer_create_proposal
+
+    rep = scan(settings, store, fake_client)
+    mr_key = key_for(store, ACTION_MANUAL_REVIEW, "001UNIONSQUARE0001")
+    accounts = []
+    for d in store.crm_snapshot(rep.run_id):
+        a = CRMAccount.from_api(d["raw"])
+        a.contacts = d.get("contacts", [])
+        accounts.append(a)
+    ctx = RuleContext(BELL, "Bellhaven Senior Living", accounts, True, 35)
+    site = SiteFacility.from_dict(store.get_proposal(mr_key).site)
+    cands = match_all([site], accounts)[0].candidates
+    newp = reviewer_create_proposal(site, ctx, cands, "different street, phone, administrator and operator")
+    assert newp.action_type == ACTION_CREATE_MISSING and newp.crm_account_ids == []
+    assert store.add_reviewer_proposal(rep.run_id, newp, "x") is True
+    before_other = dict(fake_client.accounts["001UNIONSQUARE0001"])
+    w = writable(fake_client)
+    res = apply_proposal(store, w, BELL, newp.proposal_key, "approved")
+    assert res.ok and res.created_id in w.accounts
+    assert w.accounts[res.created_id][config.FIELD_STREET] == "118 Union Square Dr" and w.accounts[res.created_id][config.FIELD_PARENT] == BELL
+    assert fake_client.accounts["001UNIONSQUARE0001"] == before_other  # untouched
+    scan(settings, store, fake_client)
+    assert store.get_proposal_row(newp.proposal_key)["apply_status"] == APPLY_APPLIED
+    assert not [r for r in store.list_proposals(decisions=["pending"]) if "Union Square" in r["title"] and r["action_type"] == ACTION_CREATE_MISSING]
+    # second apply attempt cannot create a second account
+    assert not apply_proposal(store, w, BELL, newp.proposal_key).ok
+    assert sum(1 for a in w.accounts.values() if a.get(config.FIELD_STREET) == "118 Union Square Dr") == 1

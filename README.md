@@ -45,7 +45,8 @@ python -m pytest                  # offline test suite (fixtures + fake CRM); ne
 1. Open a proposal from the queue. Read the website evidence (with source link), the current CRM record(s), every candidate that was considered (including rejected ones and why), the financial values, and the exact field-level before/after table plus the API steps that will run.
 2. **Approve & apply** (after ticking the confirmation box) re-fetches the affected account(s), refuses if anything guarded changed since the scan (`PRECONDITION_CHANGED`), re-evaluates the CHOW rule, sends the minimal PATCH/POST, then GETs the record(s) back and shows the verified state. Failures are shown as failures.
 3. **Reject** (reason required) records the decision locally only. **Mark reviewed** is the equivalent for items that have no CRM mutation (manual review / no change).
-4. Decisions persist in `data\bellhaven.sqlite3`; rescans never resurrect decided proposals. A proposal whose evidence changed appears as a clearly new item that supersedes the old one.
+4. Decisions persist in `data\bellhaven.sqlite3`; rescans never resurrect decided proposals. A proposal whose evidence changed appears as a clearly new item that supersedes the old one. Applied proposals stay visible under the *approved* decision filter.
+5. Two manual-review situations have reviewer controls that create a normal, separately approved proposal: several same-address accounts under other parents (pick the current record; CHOW rule applied to its financials) and a name-similar account at a different street (create a new account for the website address; the other account is untouched).
 
 ### Proposal types
 

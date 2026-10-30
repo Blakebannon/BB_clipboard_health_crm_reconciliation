@@ -559,6 +559,47 @@ def reviewer_selected_proposal(site: SiteFacility, account: CRMAccount, ctx: Rul
     )
 
 
+def reviewer_create_proposal(site: SiteFacility, ctx: RuleContext, candidates: list[Candidate], reviewer_reason: str) -> Proposal:
+    """Reviewer decided a name-similar account at a different street is NOT this facility.
+
+    Produces the same CREATE_MISSING proposal the scan produces when nothing matches. The
+    similarly named account is left untouched and stays listed as a rejected candidate.
+    """
+    mapped = map_care_offerings(site.care_offerings)
+    care = mapped[0] if mapped else ""
+    payload = {
+        "name": site.name,
+        "parent_id": ctx.bellhaven_parent_id,
+        "status": config.STATUS_ACTIVE,
+        "care_type": care,
+        "phone": site.phone,
+        "street": site.street,
+        "city": site.city,
+        "state": site.state,
+        "zip": site.zip,
+        "note": f"{config.NOTE_TAG} created from {site.source_url}; no CRM account at this address (reviewer confirmed the similarly named account is a different facility)"
+        + (f"; site care offerings: {', '.join(site.care_offerings)}" if len(site.care_offerings) > 1 else ""),
+    }
+    others = [f"{c.name} ({c.address}) id={c.account_id}" for c in candidates if not c.eligible]
+    return Proposal(
+        action_type=ACTION_CREATE_MISSING,
+        tier=TIER_NO_CANDIDATE,
+        reason_codes=["NO_ADDRESS_MATCH", "NAME_MATCH_ADDRESS_CONFLICT", "REVIEWER_CONFIRMED_DISTINCT"],
+        title=f"{site.name}: create new account under {ctx.bellhaven_parent_name} (reviewer confirmed distinct from similarly named account)",
+        site=site.to_dict(),
+        crm_account_ids=[],
+        before={},
+        after={"NEW": payload},
+        changes=[FieldChange("NEW", k, None, v) for k, v in payload.items()],
+        steps=[MutationStepPlan(1, "create", None, payload, f"POST /accounts: new account {site.name!r} under {ctx.bellhaven_parent_name}")],
+        candidates=candidates,
+        evidence={"site": _site_evidence(site), "match_tier": TIER_LOW_NAME_ONLY, "reviewer_reason": reviewer_reason},
+        risk_notes=[f"Similarly named account(s) NOT matched and left unchanged: {others}", f"Reviewer reason: {reviewer_reason}"],
+        target_parent_id=ctx.bellhaven_parent_id,
+        requires_chow=False,
+    )
+
+
 # --- duplicates -------------------------------------------------------------------------
 
 
