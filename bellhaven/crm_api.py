@@ -71,7 +71,8 @@ def record_id(item: Any) -> str:
     """Identifier of a list/detail/create record; the live API uses ``account_id`` / ``contact_id``."""
     if not isinstance(item, dict):
         return ""
-    for k in (config.FIELD_ID, "id", "contact_id"):
+    # contact_id first: contact records also carry account_id (their parent), which is NOT their identity
+    for k in ("contact_id", config.FIELD_ID, "id"):
         v = item.get(k)
         if v not in (None, ""):
             return str(v)

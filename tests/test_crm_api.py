@@ -71,3 +71,11 @@ def test_read_only_client_never_sends_a_write():
 def test_repr_hides_token():
     c = CRMClient("https://example.test", TOKEN)
     assert TOKEN not in repr(c)
+
+
+@responses.activate
+def test_contacts_sharing_an_account_are_all_returned():
+    responses.get(f"{API}/contacts", json={"data": [{"contact_id": "c1", "account_id": "A"}, {"contact_id": "c2", "account_id": "A"}], "total": 3})
+    responses.get(f"{API}/contacts", json={"data": [{"contact_id": "c3", "account_id": "A"}], "total": 3})
+    c = CRMClient("https://example.test", TOKEN, page_size=2)
+    assert [x["contact_id"] for x in c.iter_all_contacts()] == ["c1", "c2", "c3"]
