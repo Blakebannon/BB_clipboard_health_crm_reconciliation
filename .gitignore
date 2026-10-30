@@ -1,0 +1,40 @@
+# Credentials and local secrets
+.env
+.env.*
+!.env.example
+*.token
+secrets/
+
+# Local state: SQLite ledger, journals, snapshots, logs, recordings
+data/
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+snapshots/
+logs/
+*.log
+recordings/
+*.mp4
+*.mkv
+*.gif
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,9 @@
+# Daily READ-ONLY reconciliation scan. It scrapes the site, reads every CRM
+# account, and refreshes the local proposal queue. It never writes to the CRM;
+# every CRM change still requires a human click in `streamlit run app.py`.
+#
+# Install on Linux/macOS with:  crontab cron/bellhaven.cron
+# Adjust paths. The SQLite ledger (data/bellhaven.sqlite3) must live on
+# persistent storage -- do not run this from an ephemeral CI runner.
+CRON_TZ=America/Denver
+0 9 * * * cd /path/to/clipboard-health-crm-reconciliation && /path/to/clipboard-health-crm-reconciliation/.venv/bin/python -m bellhaven.cli scan >> logs/daily-scan.log 2>&1

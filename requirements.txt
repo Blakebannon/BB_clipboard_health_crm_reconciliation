@@ -1,0 +1,7 @@
+requests>=2.32,<3
+beautifulsoup4>=4.12,<5
+rapidfuzz>=3.9,<4
+streamlit>=1.38,<2
+python-dotenv>=1.0,<2
+pytest>=8.0
+responses>=0.25
