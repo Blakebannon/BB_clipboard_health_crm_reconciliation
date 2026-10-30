@@ -19,7 +19,7 @@ Tiers are categorical (`HIGH_ADDRESS_EXACT`, `MEDIUM_ADDRESS_FUZZY`, `LOW_NAME_O
 
 * Evaluated at scan time and **again on a fresh GET immediately before the write**. A changed answer blocks the apply.
 * Unparseable or missing amounts are *unknown*, not zero, and block any ownership write.
-* False → `PATCH parent_id` on the existing account (Findlay $22,000/$0, Lima $47,000/$0, Kettering $0/$0, Zanesville $0/$0), bundled with separately listed field corrections.
+* False → PATCH parent_id on the existing account (Findlay $22,000/$0, Lima $47,000/$0, Zanesville $0/$0). Kettering also satisfies the financial criteria for direct re-parenting but remains unresolved due to ambiguous CRM matches.
 * True → `POST` a successor under Bellhaven from the website's current details, then `PATCH` **only** `chow_current_account` on the old account (Marietta $51,250/$3,800, Tiffin $84,000/$12,400). Old parent, status, name, financials and note are untouched and verified untouched afterwards.
 * Recovery: the successor carries a note marker `chow-successor-of:<old id>`; the ledger stores the created id the moment the POST returns. A timeout, a crash between POST and PATCH, or a restart all resolve to *find the successor, link it* — never a second POST. Tests cover each case.
 * Duplicates (two Bellhaven accounts at one address) are handled separately: loser → `Inactive` + `duplicate_of_account` + note, nothing deleted. A loser with billing history, or a survivor tie, is a manual decision. Cross-parent accounts at one address (Erie, Monroe, Sandusky/Millstone) are ownership lineage, surfaced for review, never auto-marked duplicate.
@@ -60,4 +60,4 @@ Live outcome (details and account ids in `docs/RESULTS.md`): 35 website faciliti
 
 ## Time
 
-Reconnaissance and planning were done beforehand (the plan documents). The implementation session with Claude Code, including live verification, the reviewer's approvals and the audits, ran for roughly three and a half hours of wall-clock time on October 30, 2026, more than the suggested two hours; the extra time went into the live-data refinements (PO Box, multi-candidate Kettering, contact pagination bug) and the fault-injection tests for the CHOW recovery path.
+Reconnaissance and planning were done beforehand (the plan documents). The implementation session with Claude Code, including live verification, the reviewer's approvals and the audits, ran for roughly two and a quarter hours of wall-clock time on October 30, 2026, more than the suggested two hours; the extra time went into the live-data refinements (PO Box, multi-candidate Kettering, contact pagination bug) and the fault-injection tests for the CHOW recovery path.
