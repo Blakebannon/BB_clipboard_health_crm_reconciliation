@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 from . import config
-from .crm_api import CRMClient, make_client
+from .crm_api import CRMClient, make_client, record_id
 from .models import APPLY_APPLIED, CRMAccount, Proposal
 from .pipeline import find_bellhaven_parent, run_scan
 from .store import Store
@@ -127,15 +127,25 @@ def cmd_probe(args: argparse.Namespace) -> int:
     items = client.extract_items(page)
     if items:
         print("account field types:", {k: type(v).__name__ for k, v in items[0].items()})
-        detail = client.get_account(str(items[0]["id"]))
+        detail = client.get_account(record_id(items[0]))
         print("GET /accounts/{id} field types:", {k: type(v).__name__ for k, v in detail.items()})
         extra = set(detail) - set(items[0])
         if extra:
             print("detail-only fields:", sorted(extra))
-    cpage = client.list_contacts(page=1, page_size=2) if hasattr(client, "list_contacts") else client._get("contacts", {"page": 1, "page_size": 2})
+    cpage = client._get("contacts", {"page": 1, "page_size": 2})
+    if isinstance(cpage, dict):
+        print("GET /contacts envelope keys:", {k: type(v).__name__ for k, v in cpage.items()})
     citems = client.extract_items(cpage)
     if citems:
         print("contact field types:", {k: type(v).__name__ for k, v in citems[0].items()})
+    statuses, cares, parents = set(), set(), {}
+    for a in client.iter_all_accounts():
+        statuses.add(a.get(config.FIELD_STATUS)); cares.add(a.get(config.FIELD_CARE_TYPE))
+        if not a.get(config.FIELD_PARENT):
+            parents[record_id(a)] = a.get(config.FIELD_NAME)
+    print("observed status values:", sorted(s for s in statuses if s is not None))
+    print("observed care_type values:", sorted(c for c in cares if c is not None))
+    print("top-level (parentless) accounts:", parents)
     print("writes performed:", client.successful_writes)
     return 0
 

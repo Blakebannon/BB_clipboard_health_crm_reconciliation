@@ -28,7 +28,7 @@ class CrashSimulated(RuntimeError):
 
 class FakeCRMClient:
     def __init__(self, accounts: list[dict[str, Any]], contacts: list[dict[str, Any]] | None = None, allow_writes: bool = False, page_size: int = 50):
-        self.accounts: dict[str, dict[str, Any]] = {str(a["id"]): copy.deepcopy(a) for a in accounts}
+        self.accounts: dict[str, dict[str, Any]] = {str(a[config.FIELD_ID]): copy.deepcopy(a) for a in accounts}
         self.contacts: list[dict[str, Any]] = copy.deepcopy(contacts or [])
         self.allow_writes = allow_writes
         self.page_size = page_size

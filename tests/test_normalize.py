@@ -31,6 +31,7 @@ from bellhaven.normalize import (
         ("8060 Willow Creek Ln", "8060 Willow Creek Lane"),
         ("100 Main St Suite 200", "100 Main Street"),
         ("55 Ridgewood Avenue", "55 Ridgewood Ave."),
+        ("3313 Wilmington Pike", "3313 Wilmington Pk"),
     ],
 )
 def test_equivalent_streets_normalize_equal(a, b):
@@ -56,6 +57,13 @@ def test_st_lawrence_is_saint_not_street():
     assert expand_street("1800 N Blanchard St") == "1800 North Blanchard Street"
     assert norm_street("45 St Lawrence Dr") == "45 st lawrence dr"
     assert "street lawrence" not in expand_street("45 St Lawrence Dr").lower()
+
+
+def test_po_box_is_not_a_street_address():
+    from bellhaven.normalize import is_street_address
+
+    assert not is_street_address("PO Box 517") and not is_street_address("P.O. Box 12") and not is_street_address("")
+    assert is_street_address("3156 W Prospect Rd")
 
 
 def test_address_key_blocks_on_state():

@@ -257,7 +257,38 @@ if (pending or retryable) and not row["stale"]:
                     st.error(result.message)
                 st.rerun()
         else:
-            st.markdown("No CRM change is possible for this item. Mark it reviewed to clear it from the pending queue (local ledger only).")
+            if "MULTI_PARENT_HISTORY" in p.reason_codes and p.site and run:
+                st.markdown(
+                    "**Several accounts under other parents share this address.** If you can determine which record represents the "
+                    "current facility, select it below. This creates a normal re-parent / CHOW proposal (the CHOW rule is applied to "
+                    "that account's revenue and AR) which you then review and approve separately. Nothing is written by this step."
+                )
+                options = [c for c in p.candidates if c.eligible]
+                pick = st.selectbox(
+                    "Account that represents the current facility",
+                    options=[c.account_id for c in options],
+                    format_func=lambda i: next(f"{c.name} · parent {c.parent_id or '(none)'} · rev {c.lifetime_revenue} / AR {c.outstanding_ar} · {i}" for c in options if c.account_id == i),
+                    key=f"pick-{p.proposal_key}",
+                )
+                why = st.text_input("Why this account? (required)", key=f"pickwhy-{p.proposal_key}")
+                if st.button("Create re-parent/CHOW proposal for the selected account", disabled=not why.strip(), key=f"pickbtn-{p.proposal_key}"):
+                    from bellhaven.models import CRMAccount, SiteFacility
+                    from bellhaven.rules import RuleContext, reviewer_selected_proposal
+
+                    accounts = []
+                    for d in store.crm_snapshot(run["run_id"]):
+                        a = CRMAccount.from_api(d["raw"])
+                        a.contacts = d.get("contacts", [])
+                        accounts.append(a)
+                    ctx = RuleContext(run["bellhaven_parent_id"], next(a.name for a in accounts if a.id == run["bellhaven_parent_id"]), accounts, bool(run["scrape_ok"]), int(run["site_count"] or 0))
+                    site = SiteFacility.from_dict(p.site)
+                    chosen = next(a for a in accounts if a.id == pick)
+                    newp = reviewer_selected_proposal(site, chosen, ctx, p.candidates, why.strip())
+                    created = store.add_reviewer_proposal(run["run_id"], newp, why.strip())
+                    store.acknowledge(p.proposal_key, f"reviewer selected {pick}: {why.strip()}")
+                    st.success(f"{'Created' if created else 'Already exists'}: {newp.action_type} proposal {newp.proposal_key}. Select it in the queue to review and approve.")
+                    st.rerun()
+            st.markdown("No CRM change is possible for this item as-is. Mark it reviewed to clear it from the pending queue (local ledger only).")
             ack = st.text_input("Reviewer note", key=f"ack-{p.proposal_key}")
             if st.button("Mark reviewed (no CRM change)", key=f"ackbtn-{p.proposal_key}", disabled=not pending):
                 store.acknowledge(p.proposal_key, ack)

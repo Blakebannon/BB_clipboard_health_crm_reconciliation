@@ -40,6 +40,13 @@ Claude Code (Fable 5.1) was used as the implementation assistant: it read the en
 * A `reopen`/bulk-acknowledge workflow for informational items and an export of the audit log.
 * Geocoding as an extra, non-overriding signal for near-identical addresses.
 
+## Where live data differed from the plan
+
+* Kettering has three same-address accounts under three parents, not one; the tool refuses to guess and gives the reviewer a selection control that still routes through the guarded apply path.
+* Ashtabula's CRM address is a PO Box; with name, ZIP and phone corroboration it becomes an address correction instead of a false "missing from site".
+* `Union Square Senior Living` belongs to Juniper Point, not Bellhaven.
+* The id field is `account_id`, the list envelope is `data`, and the parent is literally named "Bellhaven Senior Living (Parent Account)"; all handled by the tolerant field map and the parent finder.
+
 ## Known limitations
 
 * The OpenAPI document declares no schemas; field names and enumerations were verified empirically from live GETs (see `docs/API_DISCOVERY.md`) and are centralized in `bellhaven/config.py`.

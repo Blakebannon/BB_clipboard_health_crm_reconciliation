@@ -20,10 +20,10 @@ def _accounts(crm_fixture):
 def test_renamed_facility_matches_by_exact_address(crm_fixture):
     idx = CRMIndex(_accounts(crm_fixture))
     site = _site("Bellhaven of Kettering", "3313 Wilmington Pike", "Kettering", "OH", "45429")
-    cands = [c for c in find_candidates(site, idx) if c.eligible]
-    assert [c.account_id for c in cands] == ["001WR41PYNWXCAE2X4"]
-    assert cands[0].tier == TIER_HIGH_ADDRESS_EXACT
-    assert cands[0].name != "Bellhaven of Kettering"  # matched on address despite the rename
+    cands = {c.account_id: c for c in find_candidates(site, idx) if c.eligible}
+    assert set(cands) == {"001WR41PYNWXCAE2X4", "001KETTERINGCAMP01"}  # "Pike" and "Pk" both match
+    assert all(c.tier == TIER_HIGH_ADDRESS_EXACT for c in cands.values())
+    assert cands["001WR41PYNWXCAE2X4"].name != "Bellhaven of Kettering"  # matched on address despite the rename
 
 
 def test_st_lawrence_matches_saint_lawrence(crm_fixture):

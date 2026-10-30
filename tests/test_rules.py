@@ -59,7 +59,8 @@ def test_requires_chow_rule_table(crm_fixture):
     assert requires_chow(accs["001U6RW32TY0WSXZZB"], BELL) is True  # Tiffin 84,000 / 12,400 (strings)
     assert requires_chow(accs["001UKEFGADQ8YCZ4YM"], BELL) is False  # Findlay 22,000 / 0
     assert requires_chow(accs["001LGFPBJY4N9MB6KL"], BELL) is False  # Lima 47,000 / 0
-    assert requires_chow(accs["001WR41PYNWXCAE2X4"], BELL) is False  # Kettering 0 / 0
+    assert requires_chow(accs["001WR41PYNWXCAE2X4"], BELL) is True  # Kettering Care Centre 15,000 / 900
+    assert requires_chow(accs["001ZANESVILLE00001"], BELL) is False  # Zanesville 0 / 0
     assert requires_chow(accs["001CHESTERTON00001"], BELL) is False  # already under Bellhaven -> never CHOW
     with pytest.raises(UnsafeFinancials):
         requires_chow(accs["001BADMONEY0000001"], BELL)
@@ -95,7 +96,7 @@ def test_chow_cases_preserve_old_and_create_successor(proposals, old_id, rev, ar
 # --- Findlay / Lima / Kettering / Zanesville: direct re-parent -----------------------------
 
 
-@pytest.mark.parametrize("old_id", ["001UKEFGADQ8YCZ4YM", "001LGFPBJY4N9MB6KL", "001WR41PYNWXCAE2X4", "001ZANESVILLE00001"])
+@pytest.mark.parametrize("old_id", ["001UKEFGADQ8YCZ4YM", "001LGFPBJY4N9MB6KL", "001ZANESVILLE00001"])
 def test_direct_reparent_without_successor(proposals, old_id):
     ps = find(proposals, ACTION_REPARENT, old_id)
     assert len(ps) == 1
@@ -109,12 +110,45 @@ def test_direct_reparent_without_successor(proposals, old_id):
     assert not any(p.action_type == ACTION_CREATE_MISSING and (p.site or {}).get("name") == p.title.split(":")[0] for p in find(proposals, ACTION_CREATE_MISSING, old_id))
 
 
-def test_kettering_and_zanesville_bundle_rename(proposals):
-    k = find(proposals, ACTION_REPARENT, "001WR41PYNWXCAE2X4")[0]
-    assert {c.field for c in k.changes} == {"parent_id", "name"}
-    assert k.after["001WR41PYNWXCAE2X4"]["name"] == "Bellhaven of Kettering"
+def test_zanesville_bundles_rename_with_reparent(proposals):
     z = find(proposals, ACTION_REPARENT, "001ZANESVILLE00001")[0]
     assert {c.field for c in z.changes} == {"parent_id", "name"}
+    assert z.after["001ZANESVILLE00001"]["name"] == "Bellhaven of Zanesville"
+
+
+def test_kettering_multiple_same_address_accounts_is_manual_review(proposals):
+    """Live sandbox: several non-Bellhaven accounts at 3313 Wilmington Pike/Pk with no corroboration -> no confident write."""
+    ps = find(proposals, ACTION_MANUAL_REVIEW, "001WR41PYNWXCAE2X4")
+    assert len(ps) == 1 and "MULTI_PARENT_HISTORY" in ps[0].reason_codes
+    assert set(ps[0].crm_account_ids) == {"001WR41PYNWXCAE2X4", "001KETTERINGCAMP01"}  # Pike == Pk
+    assert not find(proposals, ACTION_REPARENT, "001WR41PYNWXCAE2X4")
+    assert not find(proposals, ACTION_CHOW_SUCCESSOR, "001WR41PYNWXCAE2X4")
+
+
+def test_reviewer_selected_candidate_gets_guarded_ownership_proposal(crm_fixture, fixture_scraper):
+    from bellhaven.rules import reviewer_selected_proposal
+
+    accs = _accounts(crm_fixture)
+    ctx = RuleContext(bellhaven_parent_id=BELL, bellhaven_parent_name="Bellhaven Senior Living", accounts=accs, scrape_complete=True, site_count=35)
+    scrape = fixture_scraper.scrape(expected_count=35)
+    site = next(f for f in scrape.facilities if "kettering" in f.slug)
+    results = match_all([site], accs)
+    by_id = {a.id: a for a in accs}
+    # Care Centre carries revenue AND AR -> the reviewer's pick must still obey the CHOW rule
+    p = reviewer_selected_proposal(site, by_id["001WR41PYNWXCAE2X4"], ctx, results[0].candidates, "ops confirmed")
+    assert p.action_type == ACTION_CHOW_SUCCESSOR and "REVIEWER_SELECTED_CANDIDATE" in p.reason_codes
+    p2 = reviewer_selected_proposal(site, by_id["001KETTERINGCAMP01"], ctx, results[0].candidates, "ops confirmed")
+    assert p2.action_type == ACTION_REPARENT and p2.after["001KETTERINGCAMP01"]["name"] == "Bellhaven of Kettering"
+
+
+def test_ashtabula_po_box_is_corroborated_address_correction(proposals):
+    ps = find(proposals, ACTION_UPDATE_FIELDS, "001ASHTABULAPOBOX1")
+    assert len(ps) == 1 and ps[0].tier == "MEDIUM_ADDRESS_FUZZY"
+    assert {c.field for c in ps[0].changes} == {"street"}
+    assert ps[0].after["001ASHTABULAPOBOX1"]["street"] == "3156 W Prospect Rd"
+    assert any("CRM_ADDRESS_NOT_A_STREET" in c.reasons and c.phone_match for c in ps[0].candidates)
+    assert not find(proposals, ACTION_MANUAL_REVIEW, "001ASHTABULAPOBOX1")
+    assert not find(proposals, ACTION_MISSING_FROM_SITE, "001ASHTABULAPOBOX1")
 
 
 def test_findlay_homepage_only_is_linked_not_created(proposals):
@@ -232,9 +266,9 @@ def test_proposal_keys_are_stable_and_ignore_note_text(proposals):
 def test_applied_chow_is_recognized_as_resolved(crm_fixture, fixture_scraper):
     """After a CHOW: old record stays under Cedar Trail with chow link; successor under Bellhaven -> no new proposal."""
     raw = json.loads(json.dumps(crm_fixture["accounts"]))
-    old = next(a for a in raw if a["id"] == "001A34WFSUYHCRBLFT")
+    old = next(a for a in raw if a["account_id"] == "001A34WFSUYHCRBLFT")
     old["chow_current_account"] = "001NEWMARIETTA0001"
-    raw.append({**old, "id": "001NEWMARIETTA0001", "parent_id": BELL, "lifetime_revenue": 0, "outstanding_ar": 0, "chow_current_account": None, "note": "[bellhaven-reconciliation] chow-successor-of:001A34WFSUYHCRBLFT"})
+    raw.append({**old, "account_id": "001NEWMARIETTA0001", "parent_id": BELL, "lifetime_revenue": 0, "outstanding_ar": 0, "chow_current_account": None, "note": "[bellhaven-reconciliation] chow-successor-of:001A34WFSUYHCRBLFT"})
     accs = [CRMAccount.from_api(a) for a in raw]
     scrape = fixture_scraper.scrape(expected_count=35)
     results = match_all(scrape.facilities, accs)
@@ -249,7 +283,7 @@ def test_applied_chow_is_recognized_as_resolved(crm_fixture, fixture_scraper):
 
 def test_applied_duplicate_is_recognized_as_resolved(crm_fixture, fixture_scraper):
     raw = json.loads(json.dumps(crm_fixture["accounts"]))
-    loser = next(a for a in raw if a["id"] == "001QU150PM4Z15UA71")
+    loser = next(a for a in raw if a["account_id"] == "001QU150PM4Z15UA71")
     loser["status"] = config.STATUS_INACTIVE
     loser["duplicate_of_account"] = "001EGU7BMJ942ZTRE6"
     accs = [CRMAccount.from_api(a) for a in raw]

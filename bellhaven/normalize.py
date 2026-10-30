@@ -66,6 +66,7 @@ SUFFIXES = {
     "parkway": "pkwy",
     "pkwy": "pkwy",
     "pike": "pike",
+    "pk": "pike",
     "place": "pl",
     "pl": "pl",
     "point": "pt",
@@ -111,6 +112,14 @@ UNIT_WORDS = {"suite", "ste", "unit", "apt", "apartment", "bldg", "building", "f
 _WS = re.compile(r"\s+")
 _PUNCT = re.compile(r"[^\w\s#&-]")
 _ORDINAL = re.compile(r"^(\d+)(st|nd|rd|th)$")
+_PO_BOX = re.compile(r"^\s*(p\.?\s*o\.?\s*box|post\s+office\s+box|box)", re.I)
+
+
+def is_street_address(street: str | None) -> bool:
+    """True when the string looks like a physical street address (has a house number, not a PO Box)."""
+    if not street or _PO_BOX.match(street):
+        return False
+    return bool(parse_street(street).number)
 
 
 def _clean_tokens(text: str) -> list[str]:
@@ -221,7 +230,7 @@ def parse_street(street: str | None) -> StreetParts:
             out.append("st")  # Saint, canonical short form identical
         elif tok in SUFFIXES and _is_suffix_position(core_tokens, i):
             out.append(SUFFIXES[tok])
-        elif tok in SUFFIXES and tok in {"pike", "broadway", "way"}:
+        elif tok in SUFFIXES and tok in {"pike", "pk", "broadway", "way"}:
             out.append(tok)
         else:
             out.append(tok)

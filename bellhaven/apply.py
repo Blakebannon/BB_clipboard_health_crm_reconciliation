@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import config
-from .crm_api import CRMClient, CRMError, CRMNotFound, CRMUncertainWrite
+from .crm_api import CRMClient, CRMError, CRMNotFound, CRMUncertainWrite, record_id
 from .models import (
     ACTION_CHOW_SUCCESSOR,
     ACTION_CREATE_MISSING,
@@ -304,7 +304,7 @@ class Applier:
         except CRMError as exc:
             self.store.update_step(sid, "failed", error=str(exc))
             raise
-        new_id = str((resp or {}).get("id") or "")
+        new_id = record_id(resp)
         if not new_id:
             self.store.update_step(sid, "uncertain", response=resp, error="create response had no id")
             found = self._existing_created(proposal, marker, payload_snapshot)

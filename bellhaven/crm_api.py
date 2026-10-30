@@ -67,6 +67,17 @@ class WriteRecord:
     at: float = field(default_factory=time.time)
 
 
+def record_id(item: Any) -> str:
+    """Identifier of a list/detail/create record; the live API uses ``account_id`` / ``contact_id``."""
+    if not isinstance(item, dict):
+        return ""
+    for k in (config.FIELD_ID, "id", "contact_id"):
+        v = item.get(k)
+        if v not in (None, ""):
+            return str(v)
+    return ""
+
+
 def _redact(text: str, token: str | None) -> str:
     if token and token in text:
         return text.replace(token, "<redacted>")
@@ -235,7 +246,7 @@ class CRMClient:
                 total = self.extract_total(payload)
             new = 0
             for item in items:
-                item_id = str(item.get("id", ""))
+                item_id = record_id(item)
                 if item_id and item_id in seen_ids:
                     continue  # server re-served a record (e.g. page past the end)
                 if item_id:

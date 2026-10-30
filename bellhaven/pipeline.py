@@ -6,6 +6,7 @@ raise if anything tried.
 """
 from __future__ import annotations
 
+import re
 import traceback
 from collections import Counter
 from dataclasses import dataclass, field
@@ -51,7 +52,11 @@ class ScanReport:
 def find_bellhaven_parent(accounts: list[CRMAccount], parent_name: str) -> CRMAccount:
     """Dynamically identify the Bellhaven parent: top-level account named like the operator."""
     target = norm_name(parent_name)
-    exact = [a for a in accounts if norm_name(a.name) == target and not a.parent_id]
+
+    def base_name(a: CRMAccount) -> str:  # "Bellhaven Senior Living (Parent Account)" -> "bellhaven senior living"
+        return norm_name(re.sub(r"\s*\(.*?\)\s*$", "", a.name))
+
+    exact = [a for a in accounts if base_name(a) == target and not a.parent_id]
     if len(exact) == 1:
         return exact[0]
     if len(exact) > 1:

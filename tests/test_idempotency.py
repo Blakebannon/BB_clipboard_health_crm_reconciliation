@@ -29,7 +29,7 @@ def test_two_scans_produce_identical_queue(settings, store, fake_client):
 
 def test_approved_and_rejected_stay_decided_across_two_rescans(settings, store, fake_client):
     scan(settings, store, fake_client)
-    k_reject = key_for(store, ACTION_REPARENT, "001WR41PYNWXCAE2X4")
+    k_reject = key_for(store, ACTION_REPARENT, "001ZANESVILLE00001")
     k_apply = key_for(store, ACTION_REPARENT, "001LGFPBJY4N9MB6KL")
     store.reject(k_reject, "need to double check with ops")
     assert apply_proposal(store, writable(fake_client), BELL, k_apply).ok
@@ -41,7 +41,7 @@ def test_approved_and_rejected_stay_decided_across_two_rescans(settings, store, 
         pending_keys = {r["proposal_key"] for r in store.list_proposals(decisions=[DECISION_PENDING])}
         assert k_reject not in pending_keys and k_apply not in pending_keys
     assert fake_client.successful_writes == 0  # the read-only scan client never wrote
-    assert len(fake_client.accounts) == 26
+    assert len(fake_client.accounts) == 28
 
 
 def test_changed_source_evidence_yields_new_proposal_and_supersedes_pending(settings, store, fake_client):

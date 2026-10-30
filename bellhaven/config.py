@@ -21,7 +21,7 @@ DEFAULT_BASE_URL = "https://analyst-assessment-production.up.railway.app"
 # CRM field names as observed in the sandbox UI / documented in the plan.
 # They are localized here so a rename after live verification is one edit.
 # See docs/API_DISCOVERY.md for the verified list.
-FIELD_ID = "id"
+FIELD_ID = "account_id"
 FIELD_NAME = "name"
 FIELD_PARENT = "parent_id"
 FIELD_STATUS = "status"
@@ -41,7 +41,7 @@ FIELD_NOTE = "note"
 # tolerates these so a field-name surprise degrades gracefully instead of
 # silently reading None.
 FIELD_ALIASES: dict[str, tuple[str, ...]] = {
-    FIELD_ID: ("id", "account_id"),
+    FIELD_ID: ("account_id", "id"),
     FIELD_NAME: ("name", "account_name"),
     FIELD_PARENT: ("parent_id", "parent_account_id", "parent"),
     FIELD_STATUS: ("status", "account_status"),

@@ -87,7 +87,8 @@ CREATE TABLE IF NOT EXISTS proposals (
     first_seen_run TEXT NOT NULL,
     last_seen_run TEXT NOT NULL,
     stale INTEGER NOT NULL DEFAULT 0,
-    superseded_by TEXT
+    superseded_by TEXT,
+    origin TEXT NOT NULL DEFAULT 'scan'
 );
 CREATE INDEX IF NOT EXISTS idx_proposals_site ON proposals(site_key);
 CREATE INDEX IF NOT EXISTS idx_proposals_decision ON proposals(decision, apply_status);
@@ -134,6 +135,9 @@ class Store:
         self._conn.execute("PRAGMA busy_timeout=10000")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(proposals)")}
+        if "origin" not in cols:
+            self._conn.execute("ALTER TABLE proposals ADD COLUMN origin TEXT NOT NULL DEFAULT 'scan'")
 
     def close(self) -> None:
         self._conn.close()
@@ -272,11 +276,25 @@ class Store:
                     c.execute("UPDATE proposals SET superseded_by=?, stale=1 WHERE proposal_key=?", (p.proposal_key, old["proposal_key"]))
                     counts["superseded"] += 1
             # proposals not produced by this run: mark stale (hidden by default, never deleted)
-            rows = c.execute("SELECT proposal_key FROM proposals WHERE last_seen_run<>? AND stale=0", (run_id,)).fetchall()
+            rows = c.execute("SELECT proposal_key FROM proposals WHERE last_seen_run<>? AND stale=0 AND origin='scan'", (run_id,)).fetchall()
             for r in rows:
                 c.execute("UPDATE proposals SET stale=1 WHERE proposal_key=?", (r["proposal_key"],))
                 counts["stale"] += 1
         return counts
+
+    def add_reviewer_proposal(self, run_id: str, p: Proposal, reviewer_reason: str) -> bool:
+        """Insert a proposal created by an explicit reviewer selection. Returns False if it already exists."""
+        with self.tx() as c:
+            if c.execute("SELECT 1 FROM proposals WHERE proposal_key=?", (p.proposal_key,)).fetchone():
+                return False
+            c.execute(
+                """INSERT INTO proposals(proposal_key, action_type, tier, title, site_key, crm_account_ids_json, data_json,
+                   decision, apply_status, first_seen_run, last_seen_run, stale, origin)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'reviewer')""",
+                (p.proposal_key, p.action_type, p.tier, p.title, (p.site or {}).get("slug") or (p.site or {}).get("source_url"), json.dumps(sorted(p.crm_account_ids)), json.dumps(p.to_dict(), default=str), DECISION_PENDING, APPLY_NONE, run_id, run_id),
+            )
+            self._audit(c, p.proposal_key, "reviewer_created_proposal", {"reason": reviewer_reason, "accounts": p.crm_account_ids})
+        return True
 
     def get_proposal_row(self, key: str) -> sqlite3.Row | None:
         return self._conn.execute("SELECT * FROM proposals WHERE proposal_key=?", (key,)).fetchone()

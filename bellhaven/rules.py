@@ -419,30 +419,71 @@ def _build_for_site(mr: MatchResult, ctx: RuleContext) -> list[Proposal]:
         # only losers / resolved history remain -- nothing current. Treat as needing a human.
         return [manual(f"{site.name}: only inactive/duplicate-marked accounts match this address", ["ONLY_INACTIVE_MATCHES"], ["Matching accounts are Inactive duplicates; decide whether to reactivate or create."], [a.id for a in losers], mr.tier)]
 
-    old = others[0]
+    return [ownership_proposal(site, others[0], ctx, cands, evidence, address_fuzzy, current_ids)]
+
+
+def ownership_proposal(
+    site: SiteFacility,
+    old: CRMAccount,
+    ctx: RuleContext,
+    cands: list[Candidate],
+    evidence: dict[str, Any],
+    address_fuzzy: bool = False,
+    current_ids: set[str] | None = None,
+    extra_reasons: list[str] | None = None,
+    extra_risks: list[str] | None = None,
+) -> Proposal:
+    """REPARENT or CHOW_SUCCESSOR for one wrong-parent account (or MANUAL_REVIEW when unsafe).
+
+    Also used when a reviewer explicitly selects which of several same-address accounts
+    represents the current facility; the CHOW rule is applied identically.
+    """
+    bell = ctx.bellhaven_parent_id
+    current_ids = current_ids or set()
+    extra_reasons = extra_reasons or []
+    extra_risks = extra_risks or []
+    tier_in = TIER_MEDIUM_ADDRESS_FUZZY if address_fuzzy else TIER_HIGH_ADDRESS_EXACT
+
+    def manual(title: str, reasons: list[str], risks: list[str], ids: list[str], tier: str) -> Proposal:
+        return Proposal(
+            action_type=ACTION_MANUAL_REVIEW,
+            tier=tier,
+            reason_codes=reasons + extra_reasons,
+            title=title,
+            site=site.to_dict(),
+            crm_account_ids=ids,
+            before={i: ctx.by_id[i].snapshot() for i in ids if i in ctx.by_id},
+            after={},
+            changes=[],
+            steps=[],
+            candidates=cands,
+            evidence={**evidence, "crm_accounts": [_acc_summary(ctx, ctx.by_id[i]) for i in ids if i in ctx.by_id]},
+            risk_notes=risks + extra_risks,
+            target_parent_id=bell,
+        )
+
     if old.chow_current_account and old.chow_current_account not in current_ids:
         target = ctx.by_id.get(old.chow_current_account)
-        return [
-            manual(
-                f"{site.name}: {old.name!r} already has a CHOW link to {old.chow_current_account}",
-                ["CHOW_LINK_TO_UNEXPECTED_ACCOUNT"],
-                [f"chow_current_account points at {target.name if target else 'an unknown account'} which is not a current Bellhaven account at this address."],
-                [old.id] + ([target.id] if target else []),
-                mr.tier,
-            )
-        ]
+        return manual(
+            f"{site.name}: {old.name!r} already has a CHOW link to {old.chow_current_account}",
+            ["CHOW_LINK_TO_UNEXPECTED_ACCOUNT"],
+            [f"chow_current_account points at {target.name if target else 'an unknown account'} which is not a current Bellhaven account at this address."],
+            [old.id] + ([target.id] if target else []),
+            tier_in,
+        )
     if old.is_inactive:
-        return [manual(f"{site.name}: wrong-parent account {old.name!r} is Inactive", ["INACTIVE_WRONG_PARENT"], ["An inactive account under another parent matches the address; human must decide reactivation vs new account."], [old.id], mr.tier)]
+        return manual(f"{site.name}: wrong-parent account {old.name!r} is Inactive", ["INACTIVE_WRONG_PARENT"], ["An inactive account under another parent matches the address; human must decide reactivation vs new account."], [old.id], tier_in)
 
     try:
         chow = requires_chow(old, bell)
     except UnsafeFinancials as exc:
-        return [manual(f"{site.name}: financial fields unparseable on {old.name!r}", ["FINANCIALS_UNPARSEABLE"], [str(exc), "No ownership write is safe until revenue/AR are known."], [old.id], mr.tier)]
+        return manual(f"{site.name}: financial fields unparseable on {old.name!r}", ["FINANCIALS_UNPARSEABLE"], [str(exc), "No ownership write is safe until revenue/AR are known."], [old.id], tier_in)
 
-    tier = TIER_MEDIUM_ADDRESS_FUZZY if address_fuzzy else TIER_HIGH_ADDRESS_EXACT
+    tier = tier_in
     fin = f"lifetime_revenue={old.lifetime_revenue} outstanding_ar={old.outstanding_ar}"
     if chow:
         payload, risks = _successor_payload(site, old, ctx)
+        risks.extend(extra_risks)
         risks.insert(
             0,
             f"CHOW: {old.name!r} has positive lifetime revenue AND positive outstanding AR ({fin}). "
@@ -451,11 +492,10 @@ def _build_for_site(mr: MatchResult, ctx: RuleContext) -> list[Proposal]:
         )
         after_old = dict(old.snapshot())
         after_old["chow_current_account"] = "<successor id>"
-        return [
-            Proposal(
+        return Proposal(
                 action_type=ACTION_CHOW_SUCCESSOR,
                 tier=tier,
-                reason_codes=["WRONG_PARENT", "REVENUE_POSITIVE", "AR_POSITIVE", "CHOW_REQUIRED"] + (["NAME_OUTDATED"] if norm_name(old.name) != norm_name(site.name) else []),
+                reason_codes=["WRONG_PARENT", "REVENUE_POSITIVE", "AR_POSITIVE", "CHOW_REQUIRED"] + (["NAME_OUTDATED"] if norm_name(old.name) != norm_name(site.name) else []) + extra_reasons,
                 title=f"{site.name}: CHOW -- create successor under {ctx.bellhaven_parent_name}, link from {old.name!r}",
                 site=site.to_dict(),
                 crm_account_ids=[old.id],
@@ -473,15 +513,14 @@ def _build_for_site(mr: MatchResult, ctx: RuleContext) -> list[Proposal]:
                 target_parent_id=bell,
                 requires_chow=True,
             )
-        ]
 
     # direct re-parent (+ bundled, separately listed field corrections)
     changes, reasons, risks = field_updates(site, old, address_fuzzy)
     changes.insert(0, FieldChange(old.id, "parent_id", old.parent_id, bell))
-    reasons = ["WRONG_PARENT" if old.parent_id else "PARENT_MISSING", "CHOW_NOT_REQUIRED"] + reasons
+    reasons = ["WRONG_PARENT" if old.parent_id else "PARENT_MISSING", "CHOW_NOT_REQUIRED"] + reasons + extra_reasons
     risks.insert(0, f"Direct re-parent allowed: {fin} (CHOW needs BOTH revenue > 0 AND AR > 0).")
-    return [
-        Proposal(
+    risks.extend(extra_risks)
+    return Proposal(
             action_type=ACTION_REPARENT,
             tier=tier,
             reason_codes=reasons,
@@ -499,7 +538,25 @@ def _build_for_site(mr: MatchResult, ctx: RuleContext) -> list[Proposal]:
             target_parent_id=bell,
             requires_chow=False,
         )
-    ]
+
+
+def reviewer_selected_proposal(site: SiteFacility, account: CRMAccount, ctx: RuleContext, candidates: list[Candidate], reviewer_reason: str) -> Proposal:
+    """A reviewer picked which of several same-address accounts is the current facility.
+
+    Produces the same guarded REPARENT / CHOW_SUCCESSOR proposal the scan would have produced
+    for a single candidate. Still requires Approve & apply, preflight and the CHOW re-check.
+    """
+    evidence = {"site": _site_evidence(site), "match_tier": TIER_AMBIGUOUS, "match_reasons": ["MULTI_PARENT_HISTORY"], "reviewer_reason": reviewer_reason}
+    return ownership_proposal(
+        site,
+        account,
+        ctx,
+        candidates,
+        evidence,
+        address_fuzzy=False,
+        extra_reasons=["REVIEWER_SELECTED_CANDIDATE"],
+        extra_risks=[f"Reviewer selected {account.name!r} ({account.id}) among several same-address accounts. Reason: {reviewer_reason}"],
+    )
 
 
 # --- duplicates -------------------------------------------------------------------------

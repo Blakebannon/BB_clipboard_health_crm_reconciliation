@@ -29,7 +29,7 @@ from .models import (
     CRMAccount,
     SiteFacility,
 )
-from .normalize import norm_name, norm_text
+from .normalize import is_street_address, norm_name, norm_text
 
 STREET_FUZZY_MIN = 80.0
 NAME_FUZZY_MIN = 85.0
@@ -207,7 +207,25 @@ def find_candidates(site: SiteFacility, index: CRMIndex) -> list[Candidate]:
                 c.reasons.append("ADMIN_CONTACT_MATCH")
             add(c)
 
-    # 3. name-similar accounts anywhere (transparency; never eligible on their own)
+    # 3. CRM record with no usable street (PO Box / blank): same locality + strong name + phone/admin corroboration
+    for acc in index.by_state.get(saddr.state, []):
+        if acc.id in seen or is_street_address(acc.street) or not saddr.is_usable:
+            continue
+        same_locality = (saddr.zip5 and acc.addr.zip5 == saddr.zip5) or (acc.addr.city == saddr.city)
+        if not same_locality or name_similarity(site.name, acc.name) < NAME_FUZZY_MIN:
+            continue
+        c = _candidate(site, acc, TIER_MEDIUM_ADDRESS_FUZZY, ["CRM_ADDRESS_NOT_A_STREET", "NAME_SIMILAR"], False, 0.0)
+        if c.phone_match:
+            c.reasons.append("PHONE_MATCH")
+        if c.admin_match:
+            c.reasons.append("ADMIN_CONTACT_MATCH")
+        if c.phone_match or c.admin_match:
+            c.eligible = True  # corroborated: propose replacing the PO Box with the street address
+        else:
+            c.reasons.append("NOT_ELIGIBLE_NO_CORROBORATION")
+        add(c)
+
+    # 4. name-similar accounts anywhere (transparency; never eligible on their own)
     for acc in index.accounts:
         if acc.id in seen:
             continue

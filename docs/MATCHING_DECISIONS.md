@@ -9,6 +9,7 @@ This document explains *why* the reconciliation engine decides what it decides. 
 | 1 | Street number + canonical street + state + ZIP (`AddressKey.strict`) | **Primary identity.** Exact equality -> `HIGH_ADDRESS_EXACT`. |
 | 1b | Same as above but city instead of ZIP when one side lacks a ZIP (`AddressKey.loose`) | Same tier, reason `ZIP_MISSING_CITY_MATCH`. |
 | 2 | Same number + state + (ZIP or city), street similarity >= 80 (RapidFuzz `ratio`) | `MEDIUM_ADDRESS_FUZZY` -- catches typos like *Collegate* vs *Colegate*. A single medium candidate still produces a proposal, labelled medium. |
+| 2b | CRM record has no physical street (PO Box / blank), same state + ZIP/city, name similarity >= 85, **and** a phone or administrator-contact match | `MEDIUM_ADDRESS_FUZZY`, reason `CRM_ADDRESS_NOT_A_STREET`; proposes replacing the PO Box with the site's street (Ashtabula). Without corroboration it is shown but not eligible. |
 | 3 | Facility-name similarity on *distinctive* tokens (generic words such as *Bellhaven, senior, living, care, centre* are ignored) | Never sufficient on its own. Recorded as `LOW_NAME_ONLY`, `eligible=False`, and routes the facility to `MANUAL_REVIEW`. |
 | 4 | Phone and administrator-contact match | Corroboration only (raises confidence, picks duplicate survivors). Cannot override an address contradiction. |
 
@@ -41,7 +42,7 @@ For every website facility, the eligible same-address accounts form a group. The
 | `current` exists and `others` exist | `MANUAL_REVIEW` for each other account with `CROSS_PARENT_SAME_ADDRESS_HISTORY` -- prior-ownership lineage is **not** an accidental duplicate (Erie, Monroe) |
 | No `current`, exactly one active account in `others`, financials parseable | `CHOW_SUCCESSOR` if `requires_chow`, else `REPARENT` (with bundled, separately listed field corrections) |
 | No `current`, one in `others`, financials unparseable | `MANUAL_REVIEW` `FINANCIALS_UNPARSEABLE` -- unknown is not zero |
-| No `current`, several in `others` | `MANUAL_REVIEW` `MULTI_PARENT_HISTORY` |
+| No `current`, several in `others` | `MANUAL_REVIEW` `MULTI_PARENT_HISTORY` (live Kettering: three accounts at 3313 Wilmington Pike/Pk under Harborview, Cedar Trail and no parent, all $0/$0, no corroboration). The app lets the reviewer select the record that represents the facility; that creates a normal `REPARENT`/`CHOW_SUCCESSOR` proposal (`REVIEWER_SELECTED_CANDIDATE`, origin `reviewer`, never staled by scans) which still goes through approval, preflight and the CHOW re-check. |
 | No address match, name-similar account in the same state | `MANUAL_REVIEW` `NAME_MATCH_ADDRESS_CONFLICT` (Union Square: 118 Union Square Dr vs 240 Market St) |
 | No address match at all | `CREATE_MISSING` (Amberly Manor, Hudson OH) |
 | Bellhaven child, active, not matched to any site facility and not referenced by a manual-review item, **scan complete** | `MISSING_FROM_SITE` -> status `Needs Review` + note. Nothing is detached, deleted or inactivated. Same-address accounts under other operators are listed as evidence (Sandusky / Millstone). |
@@ -58,6 +59,10 @@ requires_chow = (old_parent_id != target_parent_id) and (lifetime_revenue > 0) a
 * Evaluated at scan time **and again at apply time on a fresh GET**. If the answer differs from what the proposal assumed, apply is blocked (`CHOW_RULE_CHANGED`).
 * Revenue alone is not enough: Findlay ($22,000 / $0) and Lima ($47,000 / $0) are direct re-parents. Marietta ($51,250 / $3,800) and Tiffin ($84,000 / $12,400) are CHOWs.
 * A CHOW touches the old account in exactly one field: `chow_current_account`. Parent, status, name, financials and note stay as they are. The successor is created from the website's current details and carries an idempotency marker in its note (`[bellhaven-reconciliation] chow-successor-of:<old id>`), which is how a retry after a timeout or crash finds the already-created successor instead of creating a second one.
+
+## Phone numbers
+
+The website phone is treated as the current public contact number. In the live sandbox 14 matched accounts carry exactly the site phone and 12 carry a different number, which reads as stale CRM data rather than noise, so a differing phone is proposed as a low-risk `UPDATE_FIELDS` change (`PHONE_DIFFERS`), listed as its own line in the diff and bundled with a rename or re-parent when one exists. A phone match never overrides an address contradiction (Union Square's phone matches, its street does not: manual review).
 
 ## Care offerings
 

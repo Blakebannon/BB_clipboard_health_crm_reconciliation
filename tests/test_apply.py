@@ -89,19 +89,51 @@ def test_reparent_lima_minimal_patch_and_readback(settings, store, fake_client):
     assert w.write_log[0].payload == {config.FIELD_PARENT: BELL}
     acc = w.accounts["001LGFPBJY4N9MB6KL"]
     assert acc[config.FIELD_PARENT] == BELL and acc[config.FIELD_REVENUE] == 47000  # no successor, no financial change
-    assert len(w.accounts) == 26  # nothing created
+    assert len(w.accounts) == 28  # nothing created
     row = store.get_proposal_row(key)
     assert row["decision"] == DECISION_APPROVED and row["apply_status"] == APPLY_APPLIED
     assert [s["step_name"] for s in store.steps(key)] == ["patch", "verify"]
 
 
-def test_kettering_bundled_rename_and_reparent(settings, store, fake_client):
+def test_zanesville_bundled_rename_and_reparent(settings, store, fake_client):
     scan(settings, store, fake_client)
-    key = key_for(store, ACTION_REPARENT, "001WR41PYNWXCAE2X4")
+    key = key_for(store, ACTION_REPARENT, "001ZANESVILLE00001")
     w = writable(fake_client)
     res = apply_proposal(store, w, BELL, key)
     assert res.ok
-    assert w.write_log[0].payload == {config.FIELD_PARENT: BELL, config.FIELD_NAME: "Bellhaven of Kettering"}
+    assert w.write_log[0].payload == {config.FIELD_PARENT: BELL, config.FIELD_NAME: "Bellhaven of Zanesville"}
+
+
+def test_reviewer_created_proposal_survives_rescan_and_applies(settings, store, fake_client):
+    from bellhaven.matching import match_all
+    from bellhaven.models import ACTION_MANUAL_REVIEW, CRMAccount, SiteFacility
+    from bellhaven.rules import RuleContext, reviewer_selected_proposal
+
+    rep = scan(settings, store, fake_client)
+    mr_key = key_for(store, ACTION_MANUAL_REVIEW, "001KETTERINGCAMP01")
+    accounts = []
+    for d in store.crm_snapshot(rep.run_id):
+        a = CRMAccount.from_api(d["raw"])
+        a.contacts = d.get("contacts", [])
+        accounts.append(a)
+    ctx = RuleContext(BELL, "Bellhaven Senior Living", accounts, True, 35)
+    site = SiteFacility.from_dict(store.get_proposal(mr_key).site)
+    cands = match_all([site], accounts)[0].candidates
+    newp = reviewer_selected_proposal(site, next(a for a in accounts if a.id == "001KETTERINGCAMP01"), ctx, cands, "ops confirmed campus record")
+    assert store.add_reviewer_proposal(rep.run_id, newp, "ops confirmed") is True
+    assert store.add_reviewer_proposal(rep.run_id, newp, "again") is False
+    scan(settings, store, fake_client)  # rescan must not stale-out the reviewer's proposal
+    row = store.get_proposal_row(newp.proposal_key)
+    assert row["stale"] == 0 and row["origin"] == "reviewer" and row["decision"] == "pending"
+    w = writable(fake_client)
+    res = apply_proposal(store, w, BELL, newp.proposal_key, "approved")
+    assert res.ok, res.message
+    assert w.accounts["001KETTERINGCAMP01"][config.FIELD_PARENT] == BELL
+    assert w.accounts["001KETTERINGCAMP01"][config.FIELD_NAME] == "Bellhaven of Kettering"
+    scan(settings, store, fake_client)
+    assert store.get_proposal_row(newp.proposal_key)["apply_status"] == APPLY_APPLIED
+    pending = [r for r in store.list_proposals(decisions=["pending"]) if "Kettering" in r["title"]]
+    assert not [r for r in pending if r["action_type"] in ("REPARENT", "CHOW_SUCCESSOR")]  # ownership resolved; no re-proposal
 
 
 # --- 5. CHOW: successor created, old preserved, link set -----------------------------------------------
