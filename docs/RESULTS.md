@@ -15,7 +15,7 @@ All figures come from live, authenticated runs on **2026-10-30**. Scans, `verify
 
 Queue generated: 43 proposals (2 CHOW, 3 re-parent, 15 field updates, 1 duplicate, 3 create, 3 missing-from-site, 6 manual review, 10 no-change).
 
-## After (final scans, runs `20261030T215630Z-846687` and `…215634Z-001c78`)
+## After (final scans, runs `20261030T220558Z-d0de7a` and `20261030T220603Z-07788e`, verify at 22:06 UTC)
 
 | Measure | Before | After | Check |
 |---|---|---|---|
@@ -24,9 +24,9 @@ Queue generated: 43 proposals (2 CHOW, 3 re-parent, 15 field updates, 1 duplicat
 | Children with status `Needs Review` | 0 | 3 | Alliance, Coldwater, Sandusky ✓ |
 | Accounts flagged `created_by_candidate` | 0 | 5 | 2 successors + 3 created ✓ |
 | Proposals approved and applied | 0 | **27** | `verify`: ok=27, fail=0 |
-| Proposals rejected | 0 | 1 | Union Square manual-review item |
-| Pending actionable proposals | 43 | **0** | |
-| Remaining manual-review items | 6 | 5 pending + 1 rejected | see below |
+| Proposals rejected / acknowledged | 0 | 1 acknowledged | Union Square manual-review item (first rejected, then reopened and acknowledged after the reviewer chose the create path) |
+| Pending actionable proposals | 43 | **1** | Union Square `CREATE_MISSING` (reviewer-created, key `c9ac15470e7ce04054fb8b2d`), deliberately left unapplied |
+| Remaining manual-review items | 6 | 5 pending | see below |
 | CRM writes by scans / verify / audits | 0 | 0 | |
 
 ### Applied changes (27), each verified by GET against the proposal's before-snapshot
@@ -47,10 +47,10 @@ Queue generated: 43 proposals (2 CHOW, 3 re-parent, 15 field updates, 1 duplicat
 | scan #3 (after PO Box / `Pk` refinements) | 2 | 41 | 0 | 2 | 0 |
 | scan #4 | 0 | 43 | 0 | 0 | 0 |
 | scan after 5 approvals | 5 | 38 | 0 | 5 | 0 |
-| final scan #1 (after all 27 approvals) | 0 | 39 | 0 | 0 | 0 |
-| final scan #2 | 0 | 39 | 0 | 0 | 0 |
+| after all 27 approvals, scans #1–#2 | 0 | 39 | 0 | 0 | 0 |
+| final submission scans #1–#2 (after the Union Square reviewer action) | 0 | 39 | 0 | 0 | 0 |
 
-After approvals the scan regenerates only `NO_CHANGE` (33) and `MANUAL_REVIEW` (6) items; applied proposals keep `approved/applied` and are never re-proposed (the applied CHOW pairs are recognized through `chow_current_account`, the duplicate through `duplicate_of_account`, the Needs Review items through status + note marker). The rejected Union Square item stays rejected.
+After approvals the scan regenerates only `NO_CHANGE` (33) and `MANUAL_REVIEW` (6) items; applied proposals keep `approved/applied` and are never re-proposed (the applied CHOW pairs are recognized through `chow_current_account`, the duplicate through `duplicate_of_account`, the Needs Review items through status + note marker). The acknowledged Union Square item stays acknowledged and the reviewer-created proposal is never staled.
 
 ## Remaining exceptions (manual review)
 
@@ -60,7 +60,7 @@ After approvals the scan regenerates only `NO_CHANGE` (33) and `MANUAL_REVIEW` (
 | Erie — Harborview Shores of Erie at 4930 W Lake Rd | Bellhaven Shores of Erie is Active under Bellhaven; site administrator Angela Quinn is its CRM contact; Harborview record $0/$0, no contacts | Keep unchanged |
 | Port Clinton — Harborview Nursing & Rehab of Port Clinton at 1420 Harbor Point Dr | Bellhaven of Port Clinton is Active under Bellhaven; administrator Brenda Whitfield is its CRM contact; Harborview record $0/$0 | Keep unchanged |
 | Kettering — three accounts at 3313 Wilmington Pike/Pk (Harborview, Cedar Trail, no parent) | All $0/$0, no contacts, none has the site phone; site administrator Priya Ashby is not in the CRM | Needs investigation: which record is the current operator's cannot be determined from available data. Any choice is a direct re-parent (no CHOW: AR = 0); the app's selection control creates the guarded proposal once known |
-| Union Square — website 118 Union Square Dr vs CRM Union Square Senior Living, 240 Market St (Juniper Point) | Different street, different phone, different administrator (Dale Croft vs Phil Holloway), different operator; no account exists at the website address | Correct: create a new Bellhaven account at 118 Union Square Dr (same treatment as Amberly Manor); leave the Juniper Point record untouched. Available in the app via the "create new-account proposal" control after reopening the item |
+| Union Square — website 118 Union Square Dr vs CRM Union Square Senior Living, 240 Market St (Juniper Point) | Different street, different phone, different administrator (Dale Croft vs Phil Holloway), different operator; no account exists at the website address | Correct: create a new Bellhaven account at 118 Union Square Dr (same treatment as Amberly Manor); leave the Juniper Point record untouched. The reviewer created this `CREATE_MISSING` proposal in the app; it remains **pending (not applied)** at submission |
 
 ## Remaining risks
 

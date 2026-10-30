@@ -56,7 +56,7 @@ Claude Code (Fable 5.1) was used as the implementation assistant: it read the en
 
 ## Results
 
-Live outcome (details and account ids in `docs/RESULTS.md`): 35 website facilities, 121 → 126 CRM accounts, 29 → 37 Bellhaven children. 43 proposals generated; the reviewer approved 27 in the app (2 CHOW successors, 3 direct re-parents, 3 new accounts, 1 duplicate, 3 Needs Review, 15 field updates), every one verified by GET read-back; 1 rejected; 0 failed. Six manual-review cases remain documented with recommendations (four keep-unchanged prior-operator records, Kettering needs business input, Union Square can be created from the app). Seven scans were run; after approvals two consecutive scans were identical and no decided item ever reappeared. Zero CRM writes happened outside explicit approvals.
+Live outcome (details and account ids in `docs/RESULTS.md`): 35 website facilities, 121 → 126 CRM accounts, 29 → 37 Bellhaven children. 43 proposals generated; the reviewer approved 27 in the app (2 CHOW successors, 3 direct re-parents, 3 new accounts, 1 duplicate, 3 Needs Review, 15 field updates), every one verified by GET read-back; 0 failed. Of the six manual-review cases, four are prior-operator records at Bellhaven addresses (kept unchanged by design), Kettering needs business input (three same-address candidates, no corroboration), and Union Square was acknowledged by the reviewer, who created a new-account proposal that is intentionally left pending at submission. Eleven scans were run in total; after approvals every pair of consecutive scans was identical and no decided item ever reappeared. Zero CRM writes happened outside explicit approvals.
 
 ## Time
 
