@@ -95,3 +95,13 @@ def test_reopen_is_explicit_only(settings, store, fake_client):
     assert store.get_proposal_row(key)["decision"] == DECISION_REJECTED
     store.reopen(key, "reviewer changed their mind")
     assert store.get_proposal_row(key)["decision"] == DECISION_PENDING
+
+
+def test_applied_proposals_are_never_marked_stale(settings, store, fake_client):
+    scan(settings, store, fake_client)
+    key = key_for(store, ACTION_REPARENT, "001LGFPBJY4N9MB6KL")
+    assert apply_proposal(store, writable(fake_client), BELL, key).ok
+    scan(settings, store, fake_client)  # the scan no longer produces this proposal (it is resolved)
+    row = store.get_proposal_row(key)
+    assert row["apply_status"] == APPLY_APPLIED and row["stale"] == 0
+    assert key in {r["proposal_key"] for r in store.list_proposals(decisions=[DECISION_APPROVED])}

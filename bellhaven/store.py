@@ -138,6 +138,7 @@ class Store:
         cols = {r[1] for r in self._conn.execute("PRAGMA table_info(proposals)")}
         if "origin" not in cols:
             self._conn.execute("ALTER TABLE proposals ADD COLUMN origin TEXT NOT NULL DEFAULT 'scan'")
+        self._conn.execute("UPDATE proposals SET stale=0 WHERE apply_status='applied' AND stale=1")
 
     def close(self) -> None:
         self._conn.close()
@@ -276,7 +277,8 @@ class Store:
                     c.execute("UPDATE proposals SET superseded_by=?, stale=1 WHERE proposal_key=?", (p.proposal_key, old["proposal_key"]))
                     counts["superseded"] += 1
             # proposals not produced by this run: mark stale (hidden by default, never deleted)
-            rows = c.execute("SELECT proposal_key FROM proposals WHERE last_seen_run<>? AND stale=0 AND origin='scan'", (run_id,)).fetchall()
+            # Applied proposals are resolved history, not stale evidence: they stay visible.
+            rows = c.execute("SELECT proposal_key FROM proposals WHERE last_seen_run<>? AND stale=0 AND origin='scan' AND apply_status<>'applied'", (run_id,)).fetchall()
             for r in rows:
                 c.execute("UPDATE proposals SET stale=1 WHERE proposal_key=?", (r["proposal_key"],))
                 counts["stale"] += 1
